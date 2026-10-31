@@ -1,0 +1,343 @@
+{
+  "properties": {
+    "activities": [
+      {
+        "type": "GetMetadata",
+        "typeProperties": {
+          "datasetSettings": {
+            "type": "DelimitedText",
+            "typeProperties": {
+              "location": {
+                "type": "LakehouseLocation",
+                "folderPath": "emp"
+              },
+              "columnDelimiter": "|",
+              "quoteChar": "\"",
+              "escapeChar": "\\",
+              "firstRowAsHeader": true
+            },
+            "schema": [],
+            "linkedService": {
+              "name": "lk_vdp",
+              "properties": {
+                "type": "Lakehouse",
+                "typeProperties": {
+                  "artifactId": "a1bf9946-4d3d-bd0e-4925-b31fcde0af6b",
+                  "workspaceId": "00000000-0000-0000-0000-000000000000",
+                  "rootFolder": "Files"
+                },
+                "annotations": []
+              }
+            },
+            "annotations": []
+          },
+          "fieldList": [
+            "childItems"
+          ],
+          "storeSettings": {
+            "type": "AzureBlobStorageReadSettings",
+            "enablePartitionDiscovery": false
+          },
+          "formatSettings": {
+            "type": "DelimitedTextReadSettings"
+          }
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "name": "Get Metadata Folder",
+        "dependsOn": []
+      },
+      {
+        "type": "ForEach",
+        "typeProperties": {
+          "isSequential": true,
+          "items": {
+            "value": "@activity('Get Metadata Folder').output.childItems",
+            "type": "Expression"
+          },
+          "activities": [
+            {
+              "type": "GetMetadata",
+              "typeProperties": {
+                "datasetSettings": {
+                  "type": "DelimitedText",
+                  "typeProperties": {
+                    "location": {
+                      "type": "LakehouseLocation",
+                      "folderPath": "emp",
+                      "fileName": {
+                        "value": "@item().name",
+                        "type": "Expression"
+                      }
+                    },
+                    "columnDelimiter": "|",
+                    "quoteChar": "\"",
+                    "escapeChar": "\\",
+                    "firstRowAsHeader": true
+                  },
+                  "schema": [],
+                  "linkedService": {
+                    "name": "lk_vdp",
+                    "properties": {
+                      "type": "Lakehouse",
+                      "typeProperties": {
+                        "artifactId": "a1bf9946-4d3d-bd0e-4925-b31fcde0af6b",
+                        "workspaceId": "00000000-0000-0000-0000-000000000000",
+                        "rootFolder": "Files"
+                      },
+                      "annotations": []
+                    }
+                  },
+                  "annotations": []
+                },
+                "fieldList": [
+                  "itemName",
+                  "lastModified"
+                ],
+                "storeSettings": {
+                  "type": "AzureBlobStorageReadSettings",
+                  "enablePartitionDiscovery": false
+                },
+                "formatSettings": {
+                  "type": "DelimitedTextReadSettings"
+                }
+              },
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureInput": false,
+                "secureOutput": false
+              },
+              "name": "Get Metadata Files",
+              "dependsOn": []
+            },
+            {
+              "type": "IfCondition",
+              "typeProperties": {
+                "expression": {
+                  "value": "@greater(activity('Get Metadata Files').output.lastModified,variables('var_latest_time'))",
+                  "type": "Expression"
+                },
+                "ifTrueActivities": [
+                  {
+                    "type": "SetVariable",
+                    "typeProperties": {
+                      "variableName": "var_latest_time",
+                      "value": {
+                        "value": "@activity('Get Metadata Files').output.lastModified",
+                        "type": "Expression"
+                      }
+                    },
+                    "policy": {
+                      "secureInput": false,
+                      "secureOutput": false
+                    },
+                    "name": "Set variable last modified",
+                    "dependsOn": []
+                  },
+                  {
+                    "type": "SetVariable",
+                    "typeProperties": {
+                      "variableName": "var_file_name",
+                      "value": {
+                        "value": "@activity('Get Metadata Files').output.itemName",
+                        "type": "Expression"
+                      }
+                    },
+                    "policy": {
+                      "secureInput": false,
+                      "secureOutput": false
+                    },
+                    "name": "Set variable file name",
+                    "dependsOn": []
+                  }
+                ],
+                "ifFalseActivities": []
+              },
+              "name": "If Condition for finding latest file",
+              "dependsOn": [
+                {
+                  "activity": "Get Metadata Files",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "name": "ForEach Files",
+        "dependsOn": [
+          {
+            "activity": "Get Metadata Folder",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "Copy",
+        "typeProperties": {
+          "source": {
+            "type": "DelimitedTextSource",
+            "formatSettings": {
+              "type": "DelimitedTextReadSettings"
+            },
+            "storeSettings": {
+              "type": "AzureBlobStorageReadSettings",
+              "recursive": true,
+              "enablePartitionDiscovery": false,
+              "modifiedDatetimeStart": {
+                "value": "@formatDateTime(utcNow(),'yyyy-mm-ddT00:00:01Z')",
+                "type": "Expression"
+              },
+              "modifiedDatetimeEnd": {
+                "value": "@formatDateTime(utcNow(),'yyyy-mm-ddT23:59:59Z')",
+                "type": "Expression"
+              }
+            },
+            "datasetSettings": {
+              "type": "DelimitedText",
+              "typeProperties": {
+                "location": {
+                  "type": "LakehouseLocation",
+                  "folderPath": "emp",
+                  "fileName": {
+                    "value": "@variables('var_file_name')",
+                    "type": "Expression"
+                  }
+                },
+                "columnDelimiter": "|",
+                "quoteChar": "\"",
+                "escapeChar": "\\",
+                "firstRowAsHeader": true
+              },
+              "schema": [],
+              "linkedService": {
+                "name": "lk_vdp",
+                "properties": {
+                  "type": "Lakehouse",
+                  "typeProperties": {
+                    "artifactId": "a1bf9946-4d3d-bd0e-4925-b31fcde0af6b",
+                    "workspaceId": "00000000-0000-0000-0000-000000000000",
+                    "rootFolder": "Files"
+                  },
+                  "annotations": []
+                }
+              },
+              "annotations": []
+            }
+          },
+          "sink": {
+            "type": "LakehouseTableSink",
+            "tableActionOption": "Upsert",
+            "applyVOrder": false,
+            "enableTimestampNtz": false,
+            "upsertSettings": {
+              "keys": [
+                "id"
+              ]
+            },
+            "datasetSettings": {
+              "type": "LakehouseTable",
+              "typeProperties": {
+                "schema": "dbo",
+                "table": "emp"
+              },
+              "schema": [],
+              "linkedService": {
+                "name": "lk_vdp",
+                "properties": {
+                  "type": "Lakehouse",
+                  "typeProperties": {
+                    "artifactId": "a1bf9946-4d3d-bd0e-4925-b31fcde0af6b",
+                    "workspaceId": "00000000-0000-0000-0000-000000000000",
+                    "rootFolder": "Tables"
+                  },
+                  "annotations": []
+                }
+              },
+              "annotations": []
+            }
+          },
+          "translator": {
+            "type": "TabularTranslator",
+            "mappings": [
+              {
+                "source": {
+                  "name": "id",
+                  "type": "String",
+                  "physicalType": "String"
+                },
+                "sink": {
+                  "name": "id",
+                  "physicalType": "string"
+                }
+              },
+              {
+                "source": {
+                  "name": "name",
+                  "type": "String",
+                  "physicalType": "String"
+                },
+                "sink": {
+                  "name": "name",
+                  "physicalType": "string"
+                }
+              },
+              {
+                "source": {
+                  "name": "city",
+                  "type": "String",
+                  "physicalType": "String"
+                },
+                "sink": {
+                  "name": "city",
+                  "physicalType": "string"
+                }
+              }
+            ],
+            "typeConversion": true,
+            "typeConversionSettings": {
+              "allowDataTruncation": true,
+              "treatBooleanAsNumber": false
+            }
+          },
+          "enableStaging": false
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "name": "Copy data latest file",
+        "dependsOn": [
+          {
+            "activity": "ForEach Files",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ]
+      }
+    ],
+    "variables": {
+      "var_file_name": {
+        "type": "String"
+      },
+      "var_latest_time": {
+        "type": "String",
+        "defaultValue": "2025-09-13T03:28:52Z"
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Notebook",
+    "displayName": "ddl_script_for_table_bkup"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "827c0f6a-5d11-949d-49c5-c60e877d3707"
+  }
+}
