@@ -124,6 +124,7 @@ def unzip_files(zip_path, unzip_path):
 # CELL ********************
 
 # Loggin Function
+# to test logging
 def process_log(
         run_status,
         file_name = None,
